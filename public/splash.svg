@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" fill="#0a0a0a"/>
+
+  <!-- Gold circle -->
+  <circle cx="100" cy="100" r="60" fill="none" stroke="#D4AF37" stroke-width="4"/>
+
+  <!-- VP initials -->
+  <text x="100" y="115" font-family="serif" font-size="48" fill="#C41E3A" text-anchor="middle" font-weight="bold">VP</text>
+</svg>
