@@ -5,6 +5,7 @@ import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { config } from '@/lib/wagmi';
 import { FarcasterProvider } from '@/lib/farcaster';
+import { AppShell } from './components/AppShell';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -26,7 +27,9 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <FarcasterProvider>{children}</FarcasterProvider>
+        <FarcasterProvider>
+          <AppShell>{children}</AppShell>
+        </FarcasterProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

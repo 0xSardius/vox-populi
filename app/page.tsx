@@ -1,117 +1,195 @@
 'use client';
 
+import Link from 'next/link';
 import { useFarcaster } from '@/lib/farcaster';
 
-export default function Home() {
-  const { isReady, isInClient, fid, username, displayName, pfpUrl } =
-    useFarcaster();
+const MOCK_DATA = {
+  tvl: 1_247_832,
+  apyRange: { min: 4, max: 7 },
+  totalFunded: 312_456,
+  depositors: 847,
+};
 
-  if (!isReady) {
-    return (
-      <main className="min-h-dvh flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-muted">Loading...</p>
-        </div>
-      </main>
-    );
-  }
+export default function Home() {
+  const { displayName, pfpUrl, isInClient } = useFarcaster();
 
   return (
-    <main className="min-h-dvh flex flex-col items-center justify-center bg-background p-6">
-      <div className="max-w-md w-full space-y-8 text-center">
-        {/* Logo/Title */}
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold text-foreground">Vox Populi</h1>
-          <p className="text-lg text-secondary">
-            Earn yield. Fund journalism.
+    <div className="px-5 py-6 space-y-8">
+      {/* Header */}
+      <header className="flex items-center justify-between animate-in">
+        <div>
+          <h1 className="text-[28px] font-display font-bold text-foreground tracking-tight leading-none">
+            Vox Populi
+          </h1>
+          <p className="text-shimmer font-display text-[11px] tracking-[0.25em] uppercase mt-1.5">
+            Voice of the People
           </p>
-          <p className="text-sm text-muted">Voice of the people.</p>
         </div>
-
-        {/* Status Card */}
-        <div className="bg-surface rounded-xl p-6 border border-border space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">SDK Status</h2>
-
-          <div className="space-y-3 text-left">
-            <StatusRow
-              label="SDK Ready"
-              value={isReady ? 'Yes' : 'No'}
-              success={isReady}
+        {pfpUrl ? (
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-br from-primary/60 to-secondary/60 rounded-full blur-sm opacity-60 group-hover:opacity-100 transition-opacity" />
+            <img
+              src={pfpUrl}
+              alt={displayName || 'Profile'}
+              className="relative w-11 h-11 rounded-full ring-2 ring-secondary/40"
             />
-            <StatusRow
-              label="In Farcaster Client"
-              value={isInClient ? 'Yes' : 'No'}
-              success={isInClient}
-            />
-
-            {isInClient && (
-              <>
-                <StatusRow label="FID" value={fid?.toString() ?? 'N/A'} />
-                <StatusRow label="Username" value={username ?? 'N/A'} />
-                <StatusRow
-                  label="Display Name"
-                  value={displayName ?? 'N/A'}
-                />
-              </>
-            )}
           </div>
-
-          {pfpUrl && (
-            <div className="pt-4 border-t border-border flex justify-center">
-              <img
-                src={pfpUrl}
-                alt="Profile"
-                className="w-16 h-16 rounded-full border-2 border-secondary"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Test Instructions */}
-        {!isInClient && (
-          <div className="bg-surface/50 rounded-lg p-4 border border-border">
-            <p className="text-sm text-muted">
-              Open this app in Warpcast or a Farcaster client to test the SDK
-              integration.
-            </p>
+        ) : (
+          <div className="w-11 h-11 rounded-full bg-surface border border-border flex items-center justify-center">
+            <span className="text-secondary/50 text-xs font-display font-bold">VP</span>
           </div>
         )}
+      </header>
 
-        {/* Theme Test */}
-        <div className="flex gap-3 justify-center">
-          <div className="w-12 h-12 rounded-lg bg-primary" title="Primary (Cardinal Red)" />
-          <div className="w-12 h-12 rounded-lg bg-secondary" title="Secondary (Roman Gold)" />
-          <div className="w-12 h-12 rounded-lg bg-surface border border-border" title="Surface" />
+      {/* Hero Card */}
+      <div className="relative overflow-hidden rounded-2xl card-elevated animate-in animate-in-delay-1">
+        {/* Ambient color washes */}
+        <div className="absolute -top-24 -right-24 w-72 h-72 bg-primary/[0.06] rounded-full blur-[100px] animate-float" />
+        <div className="absolute -bottom-20 -left-20 w-56 h-56 bg-secondary/[0.06] rounded-full blur-[80px] animate-float-delayed" />
+
+        {/* Top accent */}
+        <div className="absolute top-0 left-8 right-8 accent-line-gold" />
+
+        <div className="relative p-6 space-y-5">
+          {/* TVL */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-display uppercase tracking-[0.25em] text-muted/60">
+              Total Value Locked
+            </p>
+            <p className="text-[44px] leading-none font-display font-bold text-foreground tracking-tight">
+              ${MOCK_DATA.tvl.toLocaleString()}
+            </p>
+          </div>
+
+          {/* APY */}
+          <div className="flex items-center gap-3">
+            <span className="text-[28px] font-display font-bold text-shimmer leading-none">
+              {MOCK_DATA.apyRange.min}&ndash;{MOCK_DATA.apyRange.max}%
+            </span>
+            <span className="text-[10px] font-display uppercase tracking-[0.2em] text-muted/50 mt-1">
+              APY
+            </span>
+            <span className="relative flex h-2 w-2 mt-1">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success/50" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+            </span>
+          </div>
+
+          {/* CTA Button */}
+          <Link
+            href="/deposit"
+            className="group relative block w-full py-4 px-6 overflow-hidden rounded-xl text-center press-scale"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-primary via-primary to-primary-hover" />
+            <div className="absolute inset-0 bg-gradient-to-r from-primary-hover to-primary opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="absolute inset-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]" />
+            <span className="relative font-display font-semibold text-white text-sm tracking-[0.15em] uppercase">
+              Deposit & Earn
+            </span>
+          </Link>
+        </div>
+
+        {/* Bottom accent */}
+        <div className="absolute bottom-0 left-8 right-8 accent-line-red" />
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 gap-4 animate-in animate-in-delay-2">
+        <div className="relative card-subtle rounded-xl p-4 overflow-hidden">
+          <div className="absolute top-3 right-3 text-secondary/15">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
+          </div>
+          <p className="text-[10px] font-display uppercase tracking-[0.2em] text-muted/50">
+            Journalism Funded
+          </p>
+          <p className="text-xl font-display font-bold text-secondary mt-1.5">
+            ${MOCK_DATA.totalFunded.toLocaleString()}
+          </p>
+        </div>
+
+        <div className="relative card-subtle rounded-xl p-4 overflow-hidden">
+          <div className="absolute top-3 right-3 text-primary/15">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </div>
+          <p className="text-[10px] font-display uppercase tracking-[0.2em] text-muted/50">
+            Depositors
+          </p>
+          <p className="text-xl font-display font-bold text-primary mt-1.5">
+            {MOCK_DATA.depositors.toLocaleString()}
+          </p>
         </div>
       </div>
-    </main>
+
+      {/* How it Works */}
+      <section className="space-y-5 animate-in animate-in-delay-3">
+        <h2 className="text-[10px] font-display uppercase tracking-[0.3em] text-muted/50">
+          How it Works
+        </h2>
+
+        <div className="relative">
+          {/* Connecting line */}
+          <div className="absolute left-[15px] top-6 bottom-6 w-px bg-gradient-to-b from-secondary/25 via-primary/15 to-secondary/25" />
+
+          <div className="space-y-5">
+            <StepCard
+              numeral="I"
+              title="Deposit USDC"
+              description="Choose your lock period and strategy on Base"
+            />
+            <StepCard
+              numeral="II"
+              title="Earn Yield"
+              description="Your assets generate returns via Aave V3"
+            />
+            <StepCard
+              numeral="III"
+              title="Fund Journalism"
+              description="A portion of yield flows to independent newsrooms"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Dev notice */}
+      {!isInClient && (
+        <div className="animate-in animate-in-delay-4 rounded-xl p-4 card-subtle">
+          <p className="text-[10px] text-muted/40 text-center font-display tracking-[0.2em] uppercase">
+            Open in Warpcast to connect wallet
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 
-function StatusRow({
-  label,
-  value,
-  success,
+function StepCard({
+  numeral,
+  title,
+  description,
 }: {
-  label: string;
-  value: string;
-  success?: boolean;
+  numeral: string;
+  title: string;
+  description: string;
 }) {
   return (
-    <div className="flex justify-between items-center">
-      <span className="text-muted">{label}</span>
-      <span
-        className={
-          success === undefined
-            ? 'text-foreground'
-            : success
-              ? 'text-success'
-              : 'text-muted'
-        }
-      >
-        {value}
-      </span>
+    <div className="flex gap-4 items-start">
+      <div className="relative z-10 w-[30px] h-[30px] rounded-full bg-[#111] border border-secondary/15 flex items-center justify-center flex-shrink-0 shadow-[0_0_8px_rgba(212,175,55,0.06)]">
+        <span className="text-secondary/80 font-display text-[11px] font-semibold">{numeral}</span>
+      </div>
+      <div className="pt-0.5">
+        <p className="font-display font-semibold text-foreground text-[15px] leading-snug">{title}</p>
+        <p className="text-[13px] text-muted/60 mt-0.5 leading-relaxed">{description}</p>
+      </div>
     </div>
   );
 }

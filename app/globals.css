@@ -33,6 +33,7 @@
   --color-error: var(--error);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-cinzel);
 }
 
 body {
@@ -42,21 +43,129 @@ body {
   min-height: 100dvh;
 }
 
-/* Scrollbar styling for dark theme */
+/* ── Scrollbar ──────────────────────────────────── */
+
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--surface);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
+}
+
+/* ── Safe area ──────────────────────────────────── */
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* ── Keyframe animations ────────────────────────── */
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* ── Animation utilities ────────────────────────── */
+
+.animate-in {
+  animation: fade-in-up 0.5s ease-out both;
+}
+
+.animate-in-delay-1 { animation-delay: 80ms; }
+.animate-in-delay-2 { animation-delay: 160ms; }
+.animate-in-delay-3 { animation-delay: 240ms; }
+.animate-in-delay-4 { animation-delay: 320ms; }
+.animate-in-delay-5 { animation-delay: 400ms; }
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 6s ease-in-out infinite;
+  animation-delay: -3s;
+}
+
+/* ── Gold shimmer text ──────────────────────────── */
+
+.text-shimmer {
+  background: linear-gradient(
+    110deg,
+    #D4AF37 30%,
+    #f5e6a3 50%,
+    #D4AF37 70%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 3s linear infinite;
+}
+
+/* ── Card depth layers ──────────────────────────── */
+
+.card-elevated {
+  background: linear-gradient(135deg, #161616, #111111, #0c0c0c);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+}
+
+.card-subtle {
+  background: rgba(26, 26, 26, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* ── Accent lines ───────────────────────────────── */
+
+.accent-line-gold {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(212, 175, 55, 0.25), transparent);
+}
+
+.accent-line-red {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(196, 30, 58, 0.15), transparent);
+}
+
+/* ── Interactive states ─────────────────────────── */
+
+.press-scale {
+  transition: transform 0.15s ease;
+}
+
+.press-scale:active {
+  transform: scale(0.97);
 }
