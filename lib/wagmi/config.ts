@@ -1,8 +1,10 @@
 import { http, createConfig } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
+import { farcaster } from './farcasterConnector';
 
 export const config = createConfig({
   chains: [base, baseSepolia],
+  connectors: [farcaster()],
   transports: {
     [base.id]: http(),
     [baseSepolia.id]: http(),
@@ -14,7 +16,7 @@ export const config = createConfig({
 export const CONTRACTS = {
   USDC: {
     [base.id]: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as const,
-    [baseSepolia.id]: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const, // Circle's testnet USDC
+    [baseSepolia.id]: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const,
   },
   AAVE_POOL: {
     [base.id]: '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5' as const,

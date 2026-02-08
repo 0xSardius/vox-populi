@@ -8,9 +8,9 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
+import { useAccount, useConnect } from 'wagmi';
 import { sdk, isInFarcasterClient, getAuthToken } from './sdk';
 
-// Type for the Farcaster context returned by sdk.context
 interface FarcasterUser {
   fid: number;
   username?: string;
@@ -35,23 +35,14 @@ interface MiniAppContext {
 }
 
 interface FarcasterContextValue {
-  /** Whether the SDK is ready */
   isReady: boolean;
-  /** Whether we're inside a Farcaster client */
   isInClient: boolean;
-  /** User context from the SDK */
   context: MiniAppContext | null;
-  /** Current auth token */
   authToken: string | null;
-  /** Refresh the auth token */
   refreshToken: () => Promise<string | null>;
-  /** User's FID if available */
   fid: number | null;
-  /** User's username if available */
   username: string | null;
-  /** User's display name if available */
   displayName: string | null;
-  /** User's pfp URL if available */
   pfpUrl: string | null;
 }
 
@@ -67,6 +58,10 @@ export function FarcasterProvider({ children }: FarcasterProviderProps) {
   const [context, setContext] = useState<MiniAppContext | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
 
+  // Wagmi hooks for auto-connect
+  const { isConnected } = useAccount();
+  const { connect, connectors } = useConnect();
+
   const refreshToken = useCallback(async () => {
     const token = await getAuthToken();
     setAuthToken(token);
@@ -80,23 +75,16 @@ export function FarcasterProvider({ children }: FarcasterProviderProps) {
 
       if (inClient) {
         try {
-          // Signal that the app is ready to display
           await sdk.actions.ready();
-
-          // Get user context (sdk.context is a Promise)
           const ctx = await sdk.context;
           setContext(ctx);
-
-          // Get initial auth token
           await refreshToken();
-
           setIsReady(true);
         } catch (error) {
           console.error('Failed to initialize Farcaster SDK:', error);
-          setIsReady(true); // Still mark as ready so app doesn't hang
+          setIsReady(true);
         }
       } else {
-        // Not in Farcaster client, still mark as ready
         setIsReady(true);
       }
     };
@@ -104,7 +92,22 @@ export function FarcasterProvider({ children }: FarcasterProviderProps) {
     init();
   }, [refreshToken]);
 
-  // Extract user info from context
+  // Auto-connect Farcaster wallet once SDK is ready
+  useEffect(() => {
+    if (isReady && isInClient && !isConnected) {
+      const farcasterConnector = connectors.find((c) => c.id === 'farcaster');
+      if (farcasterConnector) {
+        connect(
+          { connector: farcasterConnector },
+          {
+            onError: (err) =>
+              console.warn('Farcaster wallet auto-connect failed:', err),
+          }
+        );
+      }
+    }
+  }, [isReady, isInClient, isConnected, connect, connectors]);
+
   const user = context?.user;
   const fid = user?.fid ?? null;
   const username = user?.username ?? null;

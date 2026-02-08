@@ -2,16 +2,26 @@
 
 import Link from 'next/link';
 import { useFarcaster } from '@/lib/farcaster';
+import { useVaultStats, formatUsdc } from '@/lib/contracts';
 
+// Fallback data when vault is not yet deployed
 const MOCK_DATA = {
   tvl: 1_247_832,
-  apyRange: { min: 4, max: 7 },
   totalFunded: 312_456,
   depositors: 847,
 };
 
 export default function Home() {
   const { displayName, pfpUrl, isInClient } = useFarcaster();
+  const { totalDeposited, totalFunded, isLive } = useVaultStats();
+
+  // Use live data when available, otherwise mock
+  const tvl = isLive && totalDeposited !== undefined
+    ? Number(formatUsdc(totalDeposited))
+    : MOCK_DATA.tvl;
+  const funded = isLive && totalFunded !== undefined
+    ? Number(formatUsdc(totalFunded))
+    : MOCK_DATA.totalFunded;
 
   return (
     <div className="px-5 py-6 space-y-8">
@@ -43,28 +53,30 @@ export default function Home() {
 
       {/* Hero Card */}
       <div className="relative overflow-hidden rounded-2xl card-elevated animate-in animate-in-delay-1">
-        {/* Ambient color washes */}
         <div className="absolute -top-24 -right-24 w-72 h-72 bg-primary/[0.06] rounded-full blur-[100px] animate-float" />
         <div className="absolute -bottom-20 -left-20 w-56 h-56 bg-secondary/[0.06] rounded-full blur-[80px] animate-float-delayed" />
-
-        {/* Top accent */}
         <div className="absolute top-0 left-8 right-8 accent-line-gold" />
 
         <div className="relative p-6 space-y-5">
-          {/* TVL */}
           <div className="space-y-1.5">
-            <p className="text-[10px] font-display uppercase tracking-[0.25em] text-muted/60">
-              Total Value Locked
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] font-display uppercase tracking-[0.25em] text-muted/60">
+                Total Value Locked
+              </p>
+              {!isLive && (
+                <span className="text-[8px] font-display uppercase tracking-wider text-muted/30 bg-white/[0.04] px-1.5 py-0.5 rounded">
+                  Demo
+                </span>
+              )}
+            </div>
             <p className="text-[44px] leading-none font-display font-bold text-foreground tracking-tight">
-              ${MOCK_DATA.tvl.toLocaleString()}
+              ${tvl.toLocaleString()}
             </p>
           </div>
 
-          {/* APY */}
           <div className="flex items-center gap-3">
             <span className="text-[28px] font-display font-bold text-shimmer leading-none">
-              {MOCK_DATA.apyRange.min}&ndash;{MOCK_DATA.apyRange.max}%
+              4&ndash;7%
             </span>
             <span className="text-[10px] font-display uppercase tracking-[0.2em] text-muted/50 mt-1">
               APY
@@ -75,7 +87,6 @@ export default function Home() {
             </span>
           </div>
 
-          {/* CTA Button */}
           <Link
             href="/deposit"
             className="group relative block w-full py-4 px-6 overflow-hidden rounded-xl text-center press-scale"
@@ -89,7 +100,6 @@ export default function Home() {
           </Link>
         </div>
 
-        {/* Bottom accent */}
         <div className="absolute bottom-0 left-8 right-8 accent-line-red" />
       </div>
 
@@ -108,7 +118,7 @@ export default function Home() {
             Journalism Funded
           </p>
           <p className="text-xl font-display font-bold text-secondary mt-1.5">
-            ${MOCK_DATA.totalFunded.toLocaleString()}
+            ${funded.toLocaleString()}
           </p>
         </div>
 
@@ -135,32 +145,16 @@ export default function Home() {
         <h2 className="text-[10px] font-display uppercase tracking-[0.3em] text-muted/50">
           How it Works
         </h2>
-
         <div className="relative">
-          {/* Connecting line */}
           <div className="absolute left-[15px] top-6 bottom-6 w-px bg-gradient-to-b from-secondary/25 via-primary/15 to-secondary/25" />
-
           <div className="space-y-5">
-            <StepCard
-              numeral="I"
-              title="Deposit USDC"
-              description="Choose your lock period and strategy on Base"
-            />
-            <StepCard
-              numeral="II"
-              title="Earn Yield"
-              description="Your assets generate returns via Aave V3"
-            />
-            <StepCard
-              numeral="III"
-              title="Fund Journalism"
-              description="A portion of yield flows to independent newsrooms"
-            />
+            <StepCard numeral="I" title="Deposit USDC" description="Choose your lock period and strategy on Base" />
+            <StepCard numeral="II" title="Earn Yield" description="Your assets generate returns via Aave V3" />
+            <StepCard numeral="III" title="Fund Journalism" description="A portion of yield flows to independent newsrooms" />
           </div>
         </div>
       </section>
 
-      {/* Dev notice */}
       {!isInClient && (
         <div className="animate-in animate-in-delay-4 rounded-xl p-4 card-subtle">
           <p className="text-[10px] text-muted/40 text-center font-display tracking-[0.2em] uppercase">
@@ -172,15 +166,7 @@ export default function Home() {
   );
 }
 
-function StepCard({
-  numeral,
-  title,
-  description,
-}: {
-  numeral: string;
-  title: string;
-  description: string;
-}) {
+function StepCard({ numeral, title, description }: { numeral: string; title: string; description: string }) {
   return (
     <div className="flex gap-4 items-start">
       <div className="relative z-10 w-[30px] h-[30px] rounded-full bg-[#111] border border-secondary/15 flex items-center justify-center flex-shrink-0 shadow-[0_0_8px_rgba(212,175,55,0.06)]">
