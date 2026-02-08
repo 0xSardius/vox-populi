@@ -184,34 +184,52 @@ Use these Claude Code skills to speed up development:
 - `Deploy.s.sol` (`contracts/script/`) - Base mainnet deploy script
 - OpenZeppelin + forge-std dependencies installed
 
+**Phase 4 - Contract Integration** ✅
+- VoxVault ABI + ERC20 ABI exported with `as const` type safety (`lib/contracts/`)
+- 4 read hooks: `useVaultStats`, `useUserPositions`, `useUsdcBalance`, `useUsdcAllowance`
+- 4 write hooks: `useDeposit`, `useWithdraw`, `useClaimYield`, `useApproveUsdc`
+- Custom Farcaster wallet connector (`lib/wagmi/farcasterConnector.ts`) using `sdk.wallet.getEthereumProvider()`
+- Auto-connect in `FarcasterProvider` when inside Farcaster client
+- Deposit page: full approve → deposit → confirm flow with tx status, USDC balance display, success state
+- Dashboard: `LivePositionCard` (on-chain reads + real claim/withdraw) and `MockPositionCard` (demo fallback)
+- Home page: live TVL/funded from contract with "Demo" badge when vault not deployed
+- `tsconfig.json` target bumped to ES2020 for BigInt literal support
+- Helper utils: `formatUsdc`, `parseUsdc`, `TIER_ID_MAP`, `TIER_LABELS`, `LockTier` enum
+
 ### In Progress / Next Up
 
-**Phase 4 - Contract Integration** 🔜
-- [ ] Export VoxVault ABI to frontend (`lib/contracts/`)
-- [ ] Wagmi hooks: `useDeposit`, `useWithdraw`, `useClaimYield`, `usePositions`
-- [ ] Connect Farcaster wallet provider to Wagmi (`sdk.wallet.getEthereumProvider()`)
-- [ ] USDC approval flow before deposit
-- [ ] Transaction status UI (pending/confirming/confirmed)
-- [ ] Replace mock data with real contract reads
+**Phase 4.5 - Local Testing** 🔜
+- [ ] Verify all 3 pages render correctly in dev server
+- [ ] Test deposit form validation and UI states
+- [ ] Test dashboard mock data rendering
+- [ ] Verify Wagmi hooks don't error when vault address is empty
+- [ ] Test build passes clean
 
-**Phase 5 - Backend & Data** 🔜
-- [ ] Neon Postgres setup
+**Phase 5 - Testnet Deployment** 🔜
+- [ ] Deploy VoxVault to Base Sepolia
+- [ ] Fund test wallet with Sepolia USDC
+- [ ] Update `CONTRACTS.VOX_VAULT` with deployed address
+- [ ] End-to-end test: approve → deposit → view position → claim → withdraw
+- [ ] Vercel deployment with `NEXT_PUBLIC_URL` env var
+
+**Phase 6 - Backend & Data** 🔜
+- [ ] Neon Postgres setup (optional for MVP - can use on-chain reads only)
 - [ ] API routes: `/api/positions`, `/api/yields`, `/api/stats`
-- [ ] Contract event indexing
+- [ ] Contract event indexing for historical data
 - [ ] Leaderboard data
 
-**Phase 6 - Polish & Social** 🔜
+**Phase 7 - Polish & Social** 🔜
 - [ ] Share cards after deposit (Farcaster cast composer)
 - [ ] Farcaster manifest domain signing
 - [ ] Notifications
-- [ ] Error boundaries
-- [ ] Loading skeletons
+- [ ] Error boundaries + loading skeletons
+- [ ] Accessibility audit
 
-**Phase 7 - Deploy & Launch** 🔜
-- [ ] Deploy VoxVault to Base Sepolia (testnet)
-- [ ] Vercel deployment with env vars
+**Phase 8 - Mainnet Launch** 🔜
+- [ ] Security review of VoxVault contract
 - [ ] Deploy to Base mainnet
-- [ ] Security review
+- [ ] Set up newsroom fund multisig address
+- [ ] Final Farcaster miniapp registration
 
 ### Key Decisions Made
 - Using Farcaster SDK directly (not MiniKit/OnchainKit)
@@ -220,3 +238,17 @@ Use these Claude Code skills to speed up development:
 - Single VoxVault contract for MVP (no separate strategy contracts)
 - Simplified yield tracking (pro-rata from aUSDC balance)
 - Wagmi v3 (latest, matches wagmi skill)
+- Custom `createConnector` for Farcaster wallet (with `Promise<any>` return to handle v3.4 `withCapabilities` generic)
+- Demo mode: pages gracefully fall back to mock data when vault not deployed or wallet not connected
+- Hooks use `query: { enabled }` pattern to prevent calls when address/vault unavailable
+
+### Git History
+| Commit | Description |
+|--------|-------------|
+| `abd04b3` | Initial Create Next App |
+| `cf605f7` | Farcaster SDK setup with Roman theme |
+| `5ae6725` | Farcaster manifest and miniapp embed metadata |
+| `ea87ec8` | Premium Roman-themed UI polish across all pages |
+| `ab3f067` | VoxVault smart contract with Aave V3 yield routing (17 tests) |
+| `c8e2a13` | CLAUDE.md build progress scratchpad |
+| `09416e9` | Wire VoxVault contract hooks into frontend |
