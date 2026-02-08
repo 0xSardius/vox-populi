@@ -151,3 +151,72 @@ Use these Claude Code skills to speed up development:
 - PRD: `docs/Vox_Populi_PRD_v0.4.md`
 - Build Guide: `docs/Vox_Populi_Claude_Code_Prompt.md`
 - Farcaster SDK: `docs/farcaster-docs.txt.txt`
+
+---
+
+## Build Progress / Scratchpad
+
+### Completed
+
+**Phase 1 - Project Setup** ✅
+- Next.js 16 + React 19 + Tailwind v4 initialized
+- Farcaster SDK (`@farcaster/miniapp-sdk` v0.2.2) integrated
+- Wagmi v3 + Viem configured for Base
+- TanStack React Query provider wired up
+
+**Phase 2 - Frontend UI** ✅
+- **Home page** (`app/page.tsx`) - Hero card with TVL/APY, stats grid, how-it-works steps
+- **Deposit page** (`app/deposit/page.tsx`) - Amount input, 4 lock tier selector, 3 strategy cards, yield split viz, projected earnings
+- **Dashboard page** (`app/dashboard/page.tsx`) - Portfolio summary, position cards with unlock timers, claim/withdraw buttons
+- **AppShell** (`app/components/AppShell.tsx`) - Loading state with branded spinner, bottom nav wrapper
+- **BottomNav** (`app/components/BottomNav.tsx`) - 3-tab nav (Home/Deposit/Dashboard) with active indicators
+- **Design system** - Cinzel display font, gold shimmer animations, card-elevated/card-subtle depth system, staggered entrance animations, press-scale micro-interactions, Roman numeral step indicators
+
+**Phase 2.5 - Farcaster Integration** ✅
+- `FarcasterProvider` + `useFarcaster()` hook (`lib/farcaster/context.tsx`)
+- SDK init, Quick Auth token, user context (fid, displayName, pfpUrl)
+- Farcaster manifest route (`.well-known/farcaster.json`) - needs domain signing
+- MiniApp embed metadata in layout
+
+**Phase 3 - Smart Contracts** ✅
+- `VoxVault.sol` (`contracts/src/`) - Core vault with deposits, lock tiers, Aave V3 yield routing, yield splitting, early withdrawal penalty
+- `VoxVault.t.sol` (`contracts/test/`) - 17 tests all passing (deposits, yield splits, withdrawals, access control)
+- `Deploy.s.sol` (`contracts/script/`) - Base mainnet deploy script
+- OpenZeppelin + forge-std dependencies installed
+
+### In Progress / Next Up
+
+**Phase 4 - Contract Integration** 🔜
+- [ ] Export VoxVault ABI to frontend (`lib/contracts/`)
+- [ ] Wagmi hooks: `useDeposit`, `useWithdraw`, `useClaimYield`, `usePositions`
+- [ ] Connect Farcaster wallet provider to Wagmi (`sdk.wallet.getEthereumProvider()`)
+- [ ] USDC approval flow before deposit
+- [ ] Transaction status UI (pending/confirming/confirmed)
+- [ ] Replace mock data with real contract reads
+
+**Phase 5 - Backend & Data** 🔜
+- [ ] Neon Postgres setup
+- [ ] API routes: `/api/positions`, `/api/yields`, `/api/stats`
+- [ ] Contract event indexing
+- [ ] Leaderboard data
+
+**Phase 6 - Polish & Social** 🔜
+- [ ] Share cards after deposit (Farcaster cast composer)
+- [ ] Farcaster manifest domain signing
+- [ ] Notifications
+- [ ] Error boundaries
+- [ ] Loading skeletons
+
+**Phase 7 - Deploy & Launch** 🔜
+- [ ] Deploy VoxVault to Base Sepolia (testnet)
+- [ ] Vercel deployment with env vars
+- [ ] Deploy to Base mainnet
+- [ ] Security review
+
+### Key Decisions Made
+- Using Farcaster SDK directly (not MiniKit/OnchainKit)
+- Cinzel serif font for display text (Roman inscription aesthetic)
+- CSS-only animations (no framer-motion dependency)
+- Single VoxVault contract for MVP (no separate strategy contracts)
+- Simplified yield tracking (pro-rata from aUSDC balance)
+- Wagmi v3 (latest, matches wagmi skill)
