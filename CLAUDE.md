@@ -196,14 +196,17 @@ Use these Claude Code skills to speed up development:
 - `tsconfig.json` target bumped to ES2020 for BigInt literal support
 - Helper utils: `formatUsdc`, `parseUsdc`, `TIER_ID_MAP`, `TIER_LABELS`, `LockTier` enum
 
-### In Progress / Next Up
+**Phase 4.5 - Local Testing** ✅
+- [x] `pnpm build` passes clean (all 5 routes, 0 TypeScript errors)
+- [x] All 3 pages render correctly (200 responses, SSR → client hydration)
+- [x] Dashboard shows mock position cards in demo mode with "Demo" badge
+- [x] Home page shows mock TVL/funded stats with "Demo" badge
+- [x] Wagmi hooks safely disabled when vault address is empty (`query: { enabled: isVaultDeployed }`)
+- [x] Fonts loading (Cinzel, Geist, Geist Mono all preloaded in SSR HTML)
+- [x] Farcaster `fc:miniapp` meta tag present with correct schema
+- [x] Dev server runs with zero errors in console
 
-**Phase 4.5 - Local Testing** 🔜
-- [ ] Verify all 3 pages render correctly in dev server
-- [ ] Test deposit form validation and UI states
-- [ ] Test dashboard mock data rendering
-- [ ] Verify Wagmi hooks don't error when vault address is empty
-- [ ] Test build passes clean
+### In Progress / Next Up
 
 **Phase 5 - Testnet Deployment** 🔜
 - [ ] Deploy VoxVault to Base Sepolia
@@ -242,6 +245,31 @@ Use these Claude Code skills to speed up development:
 - Demo mode: pages gracefully fall back to mock data when vault not deployed or wallet not connected
 - Hooks use `query: { enabled }` pattern to prevent calls when address/vault unavailable
 
+### Lessons Learned
+
+**TypeScript / Build**
+- `tsconfig.json` target must be ES2020+ to use BigInt literals (`0n`). The Next.js default (ES2017) doesn't support them.
+- Always use `as const` on ABI arrays for Viem/Wagmi type inference. Without it, `functionName` and `args` lose type safety entirely.
+
+**Wagmi v3**
+- Wagmi v3.4 added a `withCapabilities` generic to the connector `connect()` method. Custom connectors need `Promise<any>` return type to avoid type conflicts. Annotate the factory function as `CreateConnectorFn`.
+- Use `query: { enabled: boolean }` on all read hooks to prevent calls when addresses are undefined or vault isn't deployed. This is the Wagmi equivalent of conditional fetching.
+- `useConnectors()` is a separate hook in v3 (not returned from `useConnect()`).
+
+**Farcaster SDK**
+- Must use dynamic `import('@farcaster/miniapp-sdk')` inside the Wagmi connector to prevent SSR crashes. The SDK assumes `window` exists.
+- Auto-connect logic lives in `FarcasterProvider` — when SDK is ready + inside Farcaster client + not already connected, it finds the `farcaster` connector by ID and calls `connect()`.
+
+**Architecture Patterns**
+- **Demo mode pattern**: Every page should gracefully fall back to mock data when the vault isn't deployed or wallet isn't connected. Use a simple `isLive` boolean and "Demo" badge so devs and users always know which state they're seeing.
+- **Guard before you call**: `isVaultDeployed` is computed once at module level from the config. Read hooks check it; write hooks are only triggered by user clicks, so they naturally won't fire when there's no vault.
+- Parallel agent work (UI + contracts simultaneously) is efficient but requires careful commit separation — keep frontend and contract commits distinct for cleaner git history.
+
+**Tooling / DX**
+- Windows creates literal `nul` files when shell output is redirected to `NUL` (case-sensitive filesystem issue). Clean these up with `rm -f nul`.
+- `pnpm build` is the single source of truth for TypeScript correctness. Run it after any significant changes.
+- Foundry submodule deps (`forge-std`, `openzeppelin-contracts`) show as modified in `git status` — this is normal and doesn't need to be committed unless versions changed.
+
 ### Git History
 | Commit | Description |
 |--------|-------------|
@@ -252,3 +280,4 @@ Use these Claude Code skills to speed up development:
 | `ab3f067` | VoxVault smart contract with Aave V3 yield routing (17 tests) |
 | `c8e2a13` | CLAUDE.md build progress scratchpad |
 | `09416e9` | Wire VoxVault contract hooks into frontend |
+| `c9449a1` | Update build progress through Phase 4 completion |
