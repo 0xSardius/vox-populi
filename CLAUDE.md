@@ -45,10 +45,18 @@ const provider = sdk.wallet.getEthereumProvider()
 | 6 months    | 60%        | 40%           |
 | 12 months   | 75%        | 25%           |
 
-### Contract Addresses (Base)
+### Contract Addresses (Base Mainnet)
 - USDC: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
 - Aave V3 Pool: `0xA238Dd80C259a72e81d7e4664a9801593F98d1c5`
 - aBasUSDC: `0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB`
+- VoxVault: _Not yet deployed_
+
+### Contract Addresses (Base Sepolia)
+- USDC (Aave mock): `0xba50Cd2A20f6DA35D788639E581bca8d0B5d4D5f` — mint at staging.aave.com/faucet
+- Aave V3 Pool: `0x8bAB6d1b75f19e9eD9fCe8b9BD338844fF79aE27`
+- aBasUSDC: `0x10F1A9D11CDf50041f3f8cB7191CBE2f31750ACC`
+- VoxVault: `0x3Ef45c1609196Df07Fae89448e1c6740660523D8`
+- Deployer: `0x1155E63A4E2B24350b351BE13E6cDcFFcDf08F57`
 
 ## Git Guidelines
 
@@ -208,10 +216,14 @@ Use these Claude Code skills to speed up development:
 
 ### In Progress / Next Up
 
-**Phase 5 - Testnet Deployment** 🔜
-- [ ] Deploy VoxVault to Base Sepolia
-- [ ] Fund test wallet with Sepolia USDC
-- [ ] Update `CONTRACTS.VOX_VAULT` with deployed address
+**Phase 5 - Testnet Deployment** ✅
+- [x] Deploy VoxVault to Base Sepolia: `0x3Ef45c1609196Df07Fae89448e1c6740660523D8`
+- [x] Deploy script: `contracts/script/DeploySepolia.s.sol` (Aave V3 Sepolia addresses hardcoded)
+- [x] Deployer wallet: `0x1155E63A4E2B24350b351BE13E6cDcFFcDf08F57` (testnet throwaway, key in `contracts/.env`)
+- [x] Updated `CONTRACTS.VOX_VAULT[baseSepolia.id]` with deployed address
+- [x] Switched `ACTIVE_CHAIN` to `baseSepolia` for testing (hooks now read from testnet)
+- [x] Updated USDC address to Aave's mock USDC (`0xba50...`) — NOT Circle's testnet USDC
+- [x] Contract verified on-chain: `totalDeposited()=0`, `owner()=deployer`, `newsroomFund()=deployer`
 - [ ] End-to-end test: approve → deposit → view position → claim → withdraw
 - [ ] Vercel deployment with `NEXT_PUBLIC_URL` env var
 
@@ -244,6 +256,7 @@ Use these Claude Code skills to speed up development:
 - Custom `createConnector` for Farcaster wallet (with `Promise<any>` return to handle v3.4 `withCapabilities` generic)
 - Demo mode: pages gracefully fall back to mock data when vault not deployed or wallet not connected
 - Hooks use `query: { enabled }` pattern to prevent calls when address/vault unavailable
+- `ACTIVE_CHAIN` pattern: single variable in wagmi config controls which chain hooks target; swap from `baseSepolia` → `base` for mainnet launch
 
 ### Lessons Learned
 
@@ -265,6 +278,12 @@ Use these Claude Code skills to speed up development:
 - **Guard before you call**: `isVaultDeployed` is computed once at module level from the config. Read hooks check it; write hooks are only triggered by user clicks, so they naturally won't fire when there's no vault.
 - Parallel agent work (UI + contracts simultaneously) is efficient but requires careful commit separation — keep frontend and contract commits distinct for cleaner git history.
 
+**Deployment**
+- Aave V3 on Base Sepolia uses its own mock USDC (`0xba50...`), NOT Circle's testnet USDC (`0x036C...`). Must mint via https://staging.aave.com/faucet/. This tripped us up initially.
+- `foundry.toml` etherscan config eagerly resolves env vars even when not verifying. Comment out the `[etherscan]` section if `BASESCAN_API_KEY` is not set, or the deploy script will fail.
+- `cast wallet new` generates a fresh deployer — cheap and disposable for testnets. Fund via Superchain/Alchemy/Coinbase faucets.
+- Base Sepolia L2 gas is extremely cheap (~0.000004 ETH for a full contract deploy).
+
 **Tooling / DX**
 - Windows creates literal `nul` files when shell output is redirected to `NUL` (case-sensitive filesystem issue). Clean these up with `rm -f nul`.
 - `pnpm build` is the single source of truth for TypeScript correctness. Run it after any significant changes.
@@ -281,3 +300,5 @@ Use these Claude Code skills to speed up development:
 | `c8e2a13` | CLAUDE.md build progress scratchpad |
 | `09416e9` | Wire VoxVault contract hooks into frontend |
 | `c9449a1` | Update build progress through Phase 4 completion |
+| `9cf0116` | Complete Phase 4.5 testing, add lessons learned |
+| `5b69f7f` | Deploy VoxVault to Base Sepolia (0x3Ef45c16) |
