@@ -9,15 +9,14 @@ import {
 import { formatUnits, parseUnits } from 'viem';
 import { voxVaultAbi } from './voxVaultAbi';
 import { erc20Abi } from './erc20Abi';
-import { CONTRACTS } from '../wagmi';
-import { base } from 'wagmi/chains';
+import { CONTRACTS, ACTIVE_CHAIN } from '../wagmi';
 
 // ── Addresses & Constants ────────────────────────
 
-const VAULT_ADDRESS = (CONTRACTS.VOX_VAULT[base.id] || undefined) as
+const VAULT_ADDRESS = (CONTRACTS.VOX_VAULT[ACTIVE_CHAIN.id] || undefined) as
   | `0x${string}`
   | undefined;
-const USDC_ADDRESS = CONTRACTS.USDC[base.id] as `0x${string}`;
+const USDC_ADDRESS = CONTRACTS.USDC[ACTIVE_CHAIN.id] as `0x${string}`;
 
 const isVaultDeployed = !!VAULT_ADDRESS && VAULT_ADDRESS.length > 2;
 

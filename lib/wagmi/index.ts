@@ -1,1 +1,1 @@
-export { config, CONTRACTS, DEFAULT_CHAIN, SUPPORTED_CHAINS } from './config';
+export { config, CONTRACTS, ACTIVE_CHAIN, DEFAULT_CHAIN, SUPPORTED_CHAINS } from './config';
