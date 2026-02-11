@@ -280,6 +280,8 @@ Use these Claude Code skills to speed up development:
 
 **Deployment**
 - Aave V3 on Base Sepolia uses its own mock USDC (`0xba50...`), NOT Circle's testnet USDC (`0x036C...`). Must mint via https://staging.aave.com/faucet/. This tripped us up initially.
+- The Aave mock USDC token's `mint()` is owner-restricted. The owner is a faucet/ACL contract (`0xD914...`), not the Aave Faucet UI contract (`0xf2a2...`). Direct `cast send` minting doesn't work — use the staging.aave.com/faucet UI instead (connect wallet, select Base Sepolia, mint USDC).
+- `contracts/.env` `source` does not work reliably in git bash on Windows. Use inline `export VAR=value &&` or set vars directly when running cast commands.
 - `foundry.toml` etherscan config eagerly resolves env vars even when not verifying. Comment out the `[etherscan]` section if `BASESCAN_API_KEY` is not set, or the deploy script will fail.
 - `cast wallet new` generates a fresh deployer — cheap and disposable for testnets. Fund via Superchain/Alchemy/Coinbase faucets.
 - Base Sepolia L2 gas is extremely cheap (~0.000004 ETH for a full contract deploy).
@@ -302,3 +304,4 @@ Use these Claude Code skills to speed up development:
 | `c9449a1` | Update build progress through Phase 4 completion |
 | `9cf0116` | Complete Phase 4.5 testing, add lessons learned |
 | `5b69f7f` | Deploy VoxVault to Base Sepolia (0x3Ef45c16) |
+| `12c87e2` | Add Base Sepolia addresses, deployment lessons learned |
