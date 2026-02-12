@@ -26,7 +26,7 @@ const STRATEGIES = [
   { id: 'aggressive', label: 'Aggressive', icon: '🚀', apy: { min: 10, max: 15 }, risk: 'Higher', available: false },
 ] as const;
 
-const MIN_DEPOSIT = 10;
+const MIN_DEPOSIT = 1;
 
 type TxStep = 'idle' | 'approving' | 'depositing' | 'confirmed';
 

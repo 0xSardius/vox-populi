@@ -121,7 +121,7 @@ contract VoxVaultTest is Test {
     function test_RevertBelowMinDeposit() public {
         vm.prank(user);
         vm.expectRevert("Below minimum deposit");
-        vault.deposit(5e6, VoxVault.LockTier.Flexible);
+        vault.deposit(0.5e6, VoxVault.LockTier.Flexible); // 0.50 USDC, below 1 USDC min
     }
     function test_YieldSplitFlexible() public {
         _depositAndClaimYield(VoxVault.LockTier.Flexible, 2500);

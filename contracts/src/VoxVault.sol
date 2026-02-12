@@ -35,7 +35,7 @@ contract VoxVault is Ownable {
     uint256 public totalDeposited;
     uint256 public totalNewsroomFunded;
     uint256 public constant EARLY_WITHDRAWAL_PENALTY_BPS = 500; // 5%
-    uint256 public constant MIN_DEPOSIT = 10e6; // 10 USDC
+    uint256 public constant MIN_DEPOSIT = 1e6; // 1 USDC
 
     event Deposited(address indexed user, uint256 indexed positionId, uint256 amount, LockTier tier);
     event Withdrawn(address indexed user, uint256 indexed positionId, uint256 amount, uint256 penalty);

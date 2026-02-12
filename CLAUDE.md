@@ -119,6 +119,7 @@ cd contracts && forge script script/Deploy.s.sol --rpc-url base
 - Farcaster Quick Auth
 
 ### Out of Scope (v2+)
+- RNBW token staking (separate vault contract — see Phase 9 below)
 - VOX governance token
 - Optimized (Yearn) and Aggressive (Pendle) strategies
 - Multi-token deposits
@@ -246,11 +247,20 @@ Use these Claude Code skills to speed up development:
 - [ ] Set up newsroom fund multisig address
 - [ ] Final Farcaster miniapp registration
 
+**Phase 9 - RNBW Token Staking** 🔜
+- [ ] Research RNBW token (contract address, chain, tokenomics)
+- [ ] Design separate RNBWVault contract (different yield strategy from USDC vault)
+- [ ] Determine yield source for RNBW (staking rewards? LP? custom?)
+- [ ] Build + test RNBWVault with Foundry
+- [ ] Frontend: multi-vault UI — token selector on deposit page
+- [ ] Deploy RNBWVault to Base
+
 ### Key Decisions Made
 - Using Farcaster SDK directly (not MiniKit/OnchainKit)
 - Cinzel serif font for display text (Roman inscription aesthetic)
 - CSS-only animations (no framer-motion dependency)
-- Single VoxVault contract for MVP (no separate strategy contracts)
+- Single VoxVault contract for MVP (no separate strategy contracts). RNBW staking will be a separate vault (Phase 9).
+- MIN_DEPOSIT lowered from 10 USDC to 1 USDC — dust deposits just earn zero yield, no risk
 - Simplified yield tracking (pro-rata from aUSDC balance)
 - Wagmi v3 (latest, matches wagmi skill)
 - Custom `createConnector` for Farcaster wallet (with `Promise<any>` return to handle v3.4 `withCapabilities` generic)
