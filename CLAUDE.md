@@ -217,15 +217,19 @@ Use these Claude Code skills to speed up development:
 
 ### In Progress / Next Up
 
-**Phase 5 - Testnet Deployment** ✅
-- [x] Deploy VoxVault to Base Sepolia: `0x3Ef45c1609196Df07Fae89448e1c6740660523D8`
-- [x] Deploy script: `contracts/script/DeploySepolia.s.sol` (Aave V3 Sepolia addresses hardcoded)
-- [x] Deployer wallet: `0x1155E63A4E2B24350b351BE13E6cDcFFcDf08F57` (testnet throwaway, key in `contracts/.env`)
-- [x] Updated `CONTRACTS.VOX_VAULT[baseSepolia.id]` with deployed address
-- [x] Switched `ACTIVE_CHAIN` to `baseSepolia` for testing (hooks now read from testnet)
-- [x] Updated USDC address to Aave's mock USDC (`0xba50...`) — NOT Circle's testnet USDC
-- [x] Contract verified on-chain: `totalDeposited()=0`, `owner()=deployer`, `newsroomFund()=deployer`
-- [ ] End-to-end test: approve → deposit → view position → claim → withdraw
+**Phase 5 - Skipping Sepolia, Going Straight to Mainnet** ⏭️
+- Sepolia deployed (`0x3Ef45c16...`) but Aave faucet minting was blocked (owner-restricted `mint()`)
+- Decision: skip testnet, deploy to Base mainnet with small real amounts ($1-5 USDC)
+- Base mainnet gas is fractions of a penny, contract has 17 passing tests, risk is minimal
+- MIN_DEPOSIT lowered to 1 USDC to enable cheap testing
+
+**Phase 5b - Base Mainnet Deployment** 🔜 ← **START HERE NEXT SESSION**
+- [ ] Generate or provide deployer wallet with Base ETH (need ~$0.01 for gas)
+- [ ] Set newsroom fund address (can be deployer for initial testing)
+- [ ] Deploy VoxVault to Base mainnet via `contracts/script/Deploy.s.sol`
+- [ ] Update `CONTRACTS.VOX_VAULT[base.id]` with deployed address
+- [ ] Switch `ACTIVE_CHAIN` from `baseSepolia` back to `base` in `lib/wagmi/config.ts`
+- [ ] End-to-end test: approve 1 USDC → deposit → view position on dashboard → claim → withdraw
 - [ ] Vercel deployment with `NEXT_PUBLIC_URL` env var
 
 **Phase 6 - Backend & Data** 🔜
@@ -315,3 +319,5 @@ Use these Claude Code skills to speed up development:
 | `9cf0116` | Complete Phase 4.5 testing, add lessons learned |
 | `5b69f7f` | Deploy VoxVault to Base Sepolia (0x3Ef45c16) |
 | `12c87e2` | Add Base Sepolia addresses, deployment lessons learned |
+| `c40722d` | Add faucet minting lessons, env sourcing notes |
+| `845173f` | Lower minimum deposit to 1 USDC, add RNBW staking to roadmap |
