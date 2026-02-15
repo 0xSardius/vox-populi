@@ -88,6 +88,10 @@ contract VoxVault is Ownable, ReentrancyGuard, Pausable {
             uint256 newYield = currentBalance - lastTrackedBalance;
             accYieldPerShare += (newYield * PRECISION) / totalDeposited;
             lastTrackedBalance = currentBalance;
+        } else if (currentBalance < lastTrackedBalance) {
+            // aUSDC balance decreased (Aave bad debt / protocol issue).
+            // Reset tracking to prevent permanently broken accumulator.
+            lastTrackedBalance = currentBalance;
         }
     }
 
@@ -136,8 +140,16 @@ contract VoxVault is Ownable, ReentrancyGuard, Pausable {
             active: true
         }));
 
+        bool wasEmpty = totalDeposited == 0;
         totalDeposited += amount;
-        lastTrackedBalance += amount;
+
+        // If this is the first deposit (or first after all withdrawals), sync to actual
+        // aUSDC balance to prevent residual yield from giving the new depositor a windfall.
+        if (wasEmpty) {
+            lastTrackedBalance = aUsdc.balanceOf(address(this));
+        } else {
+            lastTrackedBalance += amount;
+        }
 
         emit Deposited(msg.sender, positions[msg.sender].length - 1, amount, tier);
     }
@@ -159,7 +171,8 @@ contract VoxVault is Ownable, ReentrancyGuard, Pausable {
         pos.active = false;
         totalDeposited -= amount;
 
-        aavePool.withdraw(address(usdc), amount, address(this));
+        uint256 actualWithdrawn = aavePool.withdraw(address(usdc), amount, address(this));
+        require(actualWithdrawn == amount, "Aave partial withdrawal");
         lastTrackedBalance -= amount;
 
         usdc.safeTransfer(msg.sender, amount - penalty);
@@ -191,7 +204,8 @@ contract VoxVault is Ownable, ReentrancyGuard, Pausable {
         uint256 userYield = (pending * userShareBps[pos.tier]) / 10000;
         uint256 newsroomYield = pending - userYield;
 
-        aavePool.withdraw(address(usdc), pending, address(this));
+        uint256 actualWithdrawn = aavePool.withdraw(address(usdc), pending, address(this));
+        require(actualWithdrawn == pending, "Aave partial withdrawal");
         lastTrackedBalance -= pending;
 
         if (userYield > 0) usdc.safeTransfer(user, userYield);
@@ -240,5 +254,10 @@ contract VoxVault is Ownable, ReentrancyGuard, Pausable {
 
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    /// @dev Prevent accidental ownership renunciation which would brick pause/unpause and admin functions.
+    function renounceOwnership() public pure override {
+        revert("Ownership renunciation disabled");
     }
 }

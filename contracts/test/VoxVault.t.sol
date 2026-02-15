@@ -494,4 +494,187 @@ contract VoxVaultTest is Test {
         vm.expectRevert("Invalid newsroom address");
         new VoxVault(address(usdc), address(aUsdc), address(aavePool), address(0));
     }
+
+    // ── Yield Edge Cases (from security audit) ─────
+
+    function test_LateDepositorDoesNotStealEarlyYield() public {
+        // User A deposits, yield accrues, THEN User B deposits
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.ThreeMonth);
+
+        // 10 USDC yield accrues before User B joins
+        aavePool.simulateYield(address(vault), 10e6);
+
+        // User B deposits same amount
+        vm.prank(user2);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.ThreeMonth);
+
+        // User A should get all 10 USDC yield (their 50% share = 5 USDC)
+        uint256 userABalBefore = usdc.balanceOf(user);
+        vm.prank(user);
+        vault.claimYield(0);
+        uint256 userAReceived = usdc.balanceOf(user) - userABalBefore;
+        assertEq(userAReceived, 5e6, "User A should get all pre-B yield (50% of 10)");
+
+        // User B should get 0 (no yield accrued since they joined)
+        uint256 userBBalBefore = usdc.balanceOf(user2);
+        vm.prank(user2);
+        vault.claimYield(0);
+        uint256 userBReceived = usdc.balanceOf(user2) - userBBalBefore;
+        assertEq(userBReceived, 0, "User B should get zero - joined after yield accrued");
+    }
+
+    function test_WithdrawSettlesYieldBeforePrincipal() public {
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.Flexible);
+
+        // 10 USDC yield
+        aavePool.simulateYield(address(vault), 10e6);
+
+        uint256 userBalBefore = usdc.balanceOf(user);
+        uint256 newsroomBalBefore = usdc.balanceOf(newsroom);
+
+        vm.prank(user);
+        vault.withdraw(0);
+
+        uint256 userReceived = usdc.balanceOf(user) - userBalBefore;
+        uint256 newsroomReceived = usdc.balanceOf(newsroom) - newsroomBalBefore;
+
+        // Flexible = 25% user yield. User gets: 2.5 (yield) + 100 (principal) = 102.5
+        uint256 expectedYieldUser = (10e6 * 2500) / 10000; // 2.5 USDC
+        uint256 expectedYieldNewsroom = 10e6 - expectedYieldUser; // 7.5 USDC
+        assertEq(userReceived, DEPOSIT_AMOUNT + expectedYieldUser, "Withdraw should include settled yield");
+        assertEq(newsroomReceived, expectedYieldNewsroom, "Newsroom gets yield share on withdraw");
+    }
+
+    function test_ClaimYieldWithNoYieldAccrued() public {
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.ThreeMonth);
+
+        // Claim immediately — no yield has accrued
+        uint256 balBefore = usdc.balanceOf(user);
+        vm.prank(user);
+        vault.claimYield(0); // should not revert
+        uint256 received = usdc.balanceOf(user) - balBefore;
+        assertEq(received, 0, "No yield to claim");
+    }
+
+    function test_MultiplePositionsDifferentTiersYieldSplit() public {
+        // User creates a Flexible and TwelveMonth position, same amount
+        vm.startPrank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.Flexible);      // pos 0
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.TwelveMonth);   // pos 1
+        vm.stopPrank();
+
+        // 20 USDC yield accrues (10 per position, since equal deposits)
+        aavePool.simulateYield(address(vault), 20e6);
+
+        // Claim Flexible (25% user share)
+        uint256 balBefore0 = usdc.balanceOf(user);
+        vm.prank(user);
+        vault.claimYield(0);
+        uint256 received0 = usdc.balanceOf(user) - balBefore0;
+        assertEq(received0, (10e6 * 2500) / 10000, "Flexible: 25% of 10 = 2.5 USDC");
+
+        // Claim TwelveMonth (75% user share)
+        uint256 balBefore1 = usdc.balanceOf(user);
+        vm.prank(user);
+        vault.claimYield(1);
+        uint256 received1 = usdc.balanceOf(user) - balBefore1;
+        assertEq(received1, (10e6 * 7500) / 10000, "TwelveMonth: 75% of 10 = 7.5 USDC");
+    }
+
+    function test_DepositAfterAllWithdrawals_NoResidualYieldWindfall() public {
+        // User A deposits and withdraws
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.Flexible);
+        vm.prank(user);
+        vault.withdraw(0);
+
+        // Simulate residual aUSDC left in contract (e.g., Aave rebasing after withdrawal)
+        aavePool.simulateYield(address(vault), 5e6);
+
+        // User B deposits small amount — should NOT get the 5 USDC windfall
+        vm.prank(user2);
+        vault.deposit(1e6, VoxVault.LockTier.Flexible); // 1 USDC
+
+        // Check pending yield for User B — should be 0
+        (uint256 userAmount, uint256 newsroomAmount) = vault.getPendingYield(user2, 0);
+        assertEq(userAmount, 0, "New depositor should not get residual yield");
+        assertEq(newsroomAmount, 0, "Newsroom should not get residual yield");
+    }
+
+    function test_DepositAndWithdrawSameBlock() public {
+        vm.startPrank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.Flexible);
+
+        uint256 balBefore = usdc.balanceOf(user);
+        vault.withdraw(0); // Flexible unlockTime = block.timestamp, so no penalty
+        vm.stopPrank();
+
+        assertEq(usdc.balanceOf(user) - balBefore, DEPOSIT_AMOUNT, "Same-block withdraw should return full amount");
+    }
+
+    function test_PauseUnpausePreservesYield() public {
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.ThreeMonth);
+
+        // Yield accrues before pause
+        aavePool.simulateYield(address(vault), 5e6);
+        vault.pause();
+
+        // More yield accrues during pause
+        aavePool.simulateYield(address(vault), 5e6);
+        vault.unpause();
+
+        // User claims — should get ALL yield (pre + during pause)
+        uint256 balBefore = usdc.balanceOf(user);
+        vm.prank(user);
+        vault.claimYield(0);
+        uint256 received = usdc.balanceOf(user) - balBefore;
+
+        // Total yield = 10, ThreeMonth = 50% user share = 5 USDC
+        assertEq(received, 5e6, "All yield (pre + during pause) should be claimable");
+    }
+
+    function test_ClaimYieldInvalidPositionIdReverts() public {
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.Flexible);
+
+        vm.prank(user);
+        vm.expectRevert(); // array out-of-bounds
+        vault.claimYield(999);
+    }
+
+    function test_RenounceOwnershipReverts() public {
+        vm.expectRevert("Ownership renunciation disabled");
+        vault.renounceOwnership();
+    }
+
+    function test_AUsdcBalanceDecreaseDoesNotBreakAccumulator() public {
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.ThreeMonth);
+
+        // Yield accrues normally
+        aavePool.simulateYield(address(vault), 10e6);
+
+        // Simulate aUSDC bad debt: burn some aUSDC from vault
+        aUsdc.burn(address(vault), 5e6);
+
+        // User claims — should not revert, accumulator should recover
+        // The 5 USDC of yield is still there (10 accrued - 5 burned = 5 actual)
+        vm.prank(user);
+        vault.claimYield(0);
+
+        // Verify vault is still functional: new yield can accrue
+        aavePool.simulateYield(address(vault), 3e6);
+
+        uint256 balBefore = usdc.balanceOf(user);
+        vm.prank(user);
+        vault.claimYield(0);
+        uint256 received = usdc.balanceOf(user) - balBefore;
+
+        // 3 USDC new yield, 50% user share = 1.5
+        assertEq(received, (3e6 * 5000) / 10000, "Accumulator should recover after aUSDC decrease");
+    }
 }
