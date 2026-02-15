@@ -22,12 +22,12 @@ export const CONTRACTS = {
     [base.id]: '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5' as const,
   },
   VOX_VAULT: {
-    [base.id]: '' as const, // To be deployed
+    [base.id]: '0x654E89904de401eB863992D55a8211266fB6d0Ca' as const,
     [baseSepolia.id]: '0x3Ef45c1609196Df07Fae89448e1c6740660523D8' as const,
   },
 } as const;
 
 // Chain configuration — switch to `base` for mainnet launch
-export const ACTIVE_CHAIN = baseSepolia;
+export const ACTIVE_CHAIN = base;
 export const DEFAULT_CHAIN = base;
 export const SUPPORTED_CHAINS = [base, baseSepolia] as const;
