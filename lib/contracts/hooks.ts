@@ -11,6 +11,8 @@ import { voxVaultAbi } from './voxVaultAbi';
 import { erc20Abi } from './erc20Abi';
 import { CONTRACTS, ACTIVE_CHAIN } from '../wagmi';
 
+const CHAIN_ID = ACTIVE_CHAIN.id;
+
 // ── Addresses & Constants ────────────────────────
 
 const VAULT_ADDRESS = (CONTRACTS.VOX_VAULT[ACTIVE_CHAIN.id] || undefined) as
@@ -137,6 +139,7 @@ export function useApproveUsdc() {
       abi: erc20Abi,
       functionName: 'approve',
       args: [VAULT_ADDRESS!, amount],
+      chainId: CHAIN_ID,
     });
   }
 
@@ -155,6 +158,7 @@ export function useDeposit() {
       abi: voxVaultAbi,
       functionName: 'deposit',
       args: [amount, tier],
+      chainId: CHAIN_ID,
     });
   }
 
@@ -173,6 +177,7 @@ export function useWithdraw() {
       abi: voxVaultAbi,
       functionName: 'withdraw',
       args: [positionId],
+      chainId: CHAIN_ID,
     });
   }
 
@@ -191,6 +196,7 @@ export function useClaimYield() {
       abi: voxVaultAbi,
       functionName: 'claimYield',
       args: [positionId],
+      chainId: CHAIN_ID,
     });
   }
 

@@ -4,13 +4,15 @@ pragma solidity ^0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
 interface IAavePool {
     function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external;
     function withdraw(address asset, uint256 amount, address to) external returns (uint256);
 }
 
-contract VoxVault is Ownable {
+contract VoxVault is Ownable, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
     enum LockTier { Flexible, ThreeMonth, SixMonth, TwelveMonth }
@@ -20,7 +22,7 @@ contract VoxVault is Ownable {
         uint256 depositTime;
         uint256 unlockTime;
         LockTier tier;
-        uint256 lastClaimTime;
+        uint256 yieldDebt;      // accumulated yield already accounted for
         bool active;
     }
 
@@ -29,17 +31,22 @@ contract VoxVault is Ownable {
     IAavePool public immutable aavePool;
     address public newsroomFund;
 
+    uint256 public constant PRECISION = 1e18;
+    uint256 public constant MIN_DEPOSIT = 1e6; // 1 USDC
+
     mapping(LockTier => uint256) public userShareBps;
+    mapping(LockTier => uint256) public earlyWithdrawalPenaltyBps;
     mapping(address => Position[]) public positions;
 
     uint256 public totalDeposited;
     uint256 public totalNewsroomFunded;
-    uint256 public constant EARLY_WITHDRAWAL_PENALTY_BPS = 500; // 5%
-    uint256 public constant MIN_DEPOSIT = 1e6; // 1 USDC
+    uint256 public accYieldPerShare;    // accumulated yield per deposited unit, scaled by PRECISION
+    uint256 public lastTrackedBalance;  // expected aUSDC balance (for detecting new yield from rebasing)
 
     event Deposited(address indexed user, uint256 indexed positionId, uint256 amount, LockTier tier);
     event Withdrawn(address indexed user, uint256 indexed positionId, uint256 amount, uint256 penalty);
     event YieldClaimed(address indexed user, uint256 indexed positionId, uint256 userAmount, uint256 newsroomAmount);
+    event NewsroomFundUpdated(address indexed oldFund, address indexed newFund);
 
     constructor(
         address _usdc,
@@ -47,22 +54,66 @@ contract VoxVault is Ownable {
         address _aavePool,
         address _newsroomFund
     ) Ownable(msg.sender) {
+        require(_usdc != address(0), "Invalid USDC address");
+        require(_aUsdc != address(0), "Invalid aUSDC address");
+        require(_aavePool != address(0), "Invalid Aave pool address");
+        require(_newsroomFund != address(0), "Invalid newsroom address");
+
         usdc = IERC20(_usdc);
         aUsdc = IERC20(_aUsdc);
         aavePool = IAavePool(_aavePool);
         newsroomFund = _newsroomFund;
 
-        userShareBps[LockTier.Flexible] = 2500;
-        userShareBps[LockTier.ThreeMonth] = 5000;
-        userShareBps[LockTier.SixMonth] = 6000;
-        userShareBps[LockTier.TwelveMonth] = 7500;
+        // Yield split: user keeps this %, newsroom gets the rest
+        userShareBps[LockTier.Flexible] = 2500;      // 25%
+        userShareBps[LockTier.ThreeMonth] = 5000;     // 50%
+        userShareBps[LockTier.SixMonth] = 6000;       // 60%
+        userShareBps[LockTier.TwelveMonth] = 7500;    // 75%
+
+        // Early withdrawal penalties scaled by tier (per PRD)
+        earlyWithdrawalPenaltyBps[LockTier.Flexible] = 0;        // no lock = no penalty
+        earlyWithdrawalPenaltyBps[LockTier.ThreeMonth] = 500;    // 5%
+        earlyWithdrawalPenaltyBps[LockTier.SixMonth] = 750;      // 7.5%
+        earlyWithdrawalPenaltyBps[LockTier.TwelveMonth] = 1000;  // 10%
     }
 
-    function deposit(uint256 amount, LockTier tier) external {
+    // ── Yield Accumulator ──────────────────────────
+
+    /// @dev Captures any new yield from aUSDC rebasing into the per-share accumulator.
+    ///      Must be called before any operation that changes totalDeposited or aUSDC balance.
+    function _updatePool() internal {
+        if (totalDeposited == 0) return;
+        uint256 currentBalance = aUsdc.balanceOf(address(this));
+        if (currentBalance > lastTrackedBalance) {
+            uint256 newYield = currentBalance - lastTrackedBalance;
+            accYieldPerShare += (newYield * PRECISION) / totalDeposited;
+            lastTrackedBalance = currentBalance;
+        }
+    }
+
+    /// @dev Returns pending yield for a position without modifying state (for view functions).
+    function _pendingYield(Position storage pos) internal view returns (uint256) {
+        uint256 currentAcc = accYieldPerShare;
+        if (totalDeposited > 0) {
+            uint256 currentBalance = aUsdc.balanceOf(address(this));
+            if (currentBalance > lastTrackedBalance) {
+                uint256 newYield = currentBalance - lastTrackedBalance;
+                currentAcc += (newYield * PRECISION) / totalDeposited;
+            }
+        }
+        uint256 accumulated = (pos.amount * currentAcc) / PRECISION;
+        return accumulated > pos.yieldDebt ? accumulated - pos.yieldDebt : 0;
+    }
+
+    // ── Core Functions ─────────────────────────────
+
+    function deposit(uint256 amount, LockTier tier) external nonReentrant whenNotPaused {
         require(amount >= MIN_DEPOSIT, "Below minimum deposit");
 
+        _updatePool();
+
         usdc.safeTransferFrom(msg.sender, address(this), amount);
-        usdc.approve(address(aavePool), amount);
+        usdc.forceApprove(address(aavePool), amount);
         aavePool.supply(address(usdc), amount, address(this), 0);
 
         uint256 unlockTime;
@@ -81,31 +132,36 @@ contract VoxVault is Ownable {
             depositTime: block.timestamp,
             unlockTime: unlockTime,
             tier: tier,
-            lastClaimTime: block.timestamp,
+            yieldDebt: (amount * accYieldPerShare) / PRECISION,
             active: true
         }));
 
         totalDeposited += amount;
+        lastTrackedBalance += amount;
+
         emit Deposited(msg.sender, positions[msg.sender].length - 1, amount, tier);
     }
 
-    function withdraw(uint256 positionId) external {
+    function withdraw(uint256 positionId) external nonReentrant whenNotPaused {
         Position storage pos = positions[msg.sender][positionId];
         require(pos.active, "Position not active");
 
-        _claimYield(msg.sender, positionId);
+        _updatePool();
+        _settleYield(msg.sender, positionId);
 
         uint256 amount = pos.amount;
         uint256 penalty = 0;
 
         if (block.timestamp < pos.unlockTime) {
-            penalty = (amount * EARLY_WITHDRAWAL_PENALTY_BPS) / 10000;
+            penalty = (amount * earlyWithdrawalPenaltyBps[pos.tier]) / 10000;
         }
 
         pos.active = false;
         totalDeposited -= amount;
 
         aavePool.withdraw(address(usdc), amount, address(this));
+        lastTrackedBalance -= amount;
+
         usdc.safeTransfer(msg.sender, amount - penalty);
 
         if (penalty > 0) {
@@ -116,27 +172,27 @@ contract VoxVault is Ownable {
         emit Withdrawn(msg.sender, positionId, amount, penalty);
     }
 
-    function claimYield(uint256 positionId) external {
-        _claimYield(msg.sender, positionId);
+    function claimYield(uint256 positionId) external nonReentrant whenNotPaused {
+        _updatePool();
+        _settleYield(msg.sender, positionId);
     }
 
-    function _claimYield(address user, uint256 positionId) internal {
+    /// @dev Settles pending yield for a position: splits between user and newsroom, withdraws from Aave.
+    function _settleYield(address user, uint256 positionId) internal {
         Position storage pos = positions[user][positionId];
         require(pos.active, "Position not active");
 
-        uint256 aUsdcBalance = aUsdc.balanceOf(address(this));
-        if (aUsdcBalance <= totalDeposited || totalDeposited == 0) return;
+        uint256 accumulated = (pos.amount * accYieldPerShare) / PRECISION;
+        uint256 pending = accumulated > pos.yieldDebt ? accumulated - pos.yieldDebt : 0;
+        pos.yieldDebt = accumulated;
 
-        uint256 totalYield = aUsdcBalance - totalDeposited;
-        uint256 positionYield = (totalYield * pos.amount) / totalDeposited;
-        if (positionYield == 0) return;
+        if (pending == 0) return;
 
-        uint256 userYield = (positionYield * userShareBps[pos.tier]) / 10000;
-        uint256 newsroomYield = positionYield - userYield;
+        uint256 userYield = (pending * userShareBps[pos.tier]) / 10000;
+        uint256 newsroomYield = pending - userYield;
 
-        pos.lastClaimTime = block.timestamp;
-
-        aavePool.withdraw(address(usdc), positionYield, address(this));
+        aavePool.withdraw(address(usdc), pending, address(this));
+        lastTrackedBalance -= pending;
 
         if (userYield > 0) usdc.safeTransfer(user, userYield);
         if (newsroomYield > 0) {
@@ -147,7 +203,8 @@ contract VoxVault is Ownable {
         emit YieldClaimed(user, positionId, userYield, newsroomYield);
     }
 
-    // View functions
+    // ── View Functions ─────────────────────────────
+
     function getPositionCount(address user) external view returns (uint256) {
         return positions[user].length;
     }
@@ -160,7 +217,28 @@ contract VoxVault is Ownable {
         return positions[user];
     }
 
+    /// @notice Returns pending yield split into user and newsroom shares.
+    function getPendingYield(address user, uint256 positionId) external view returns (uint256 userAmount, uint256 newsroomAmount) {
+        Position storage pos = positions[user][positionId];
+        if (!pos.active) return (0, 0);
+        uint256 pending = _pendingYield(pos);
+        userAmount = (pending * userShareBps[pos.tier]) / 10000;
+        newsroomAmount = pending - userAmount;
+    }
+
+    // ── Admin Functions ────────────────────────────
+
     function setNewsroomFund(address _newsroomFund) external onlyOwner {
+        require(_newsroomFund != address(0), "Invalid newsroom address");
+        emit NewsroomFundUpdated(newsroomFund, _newsroomFund);
         newsroomFund = _newsroomFund;
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
     }
 }

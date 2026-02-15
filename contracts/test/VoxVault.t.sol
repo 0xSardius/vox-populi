@@ -17,6 +17,10 @@ contract MockERC20 is ERC20 {
         _mint(to, amount);
     }
 
+    function burn(address from, uint256 amount) external {
+        _burn(from, amount);
+    }
+
     function decimals() public view override returns (uint8) {
         return _decimals;
     }
@@ -37,6 +41,8 @@ contract MockAavePool {
     }
 
     function withdraw(address, uint256 amount, address to) external returns (uint256) {
+        // Burn aUSDC from caller (mirrors real Aave behavior)
+        aUsdc.burn(msg.sender, amount);
         usdc.transfer(to, amount);
         return amount;
     }
@@ -45,6 +51,7 @@ contract MockAavePool {
         aUsdc.mint(vaultAddr, amount);
     }
 }
+
 contract VoxVaultTest is Test {
     VoxVault public vault;
     MockERC20 public usdc;
@@ -80,6 +87,8 @@ contract VoxVaultTest is Test {
         vm.prank(user2);
         usdc.approve(address(vault), type(uint256).max);
     }
+
+    // ── Deposit Tests ──────────────────────────────
 
     function test_DepositFlexible() public {
         vm.prank(user);
@@ -121,8 +130,11 @@ contract VoxVaultTest is Test {
     function test_RevertBelowMinDeposit() public {
         vm.prank(user);
         vm.expectRevert("Below minimum deposit");
-        vault.deposit(0.5e6, VoxVault.LockTier.Flexible); // 0.50 USDC, below 1 USDC min
+        vault.deposit(0.5e6, VoxVault.LockTier.Flexible);
     }
+
+    // ── Yield Split Tests ──────────────────────────
+
     function test_YieldSplitFlexible() public {
         _depositAndClaimYield(VoxVault.LockTier.Flexible, 2500);
     }
@@ -161,6 +173,113 @@ contract VoxVaultTest is Test {
         assertEq(userReceived, expectedUserYield, "User yield mismatch");
         assertEq(newsroomReceived, expectedNewsroomYield, "Newsroom yield mismatch");
     }
+
+    // ── Multi-User Yield Fairness (the critical bug fix) ───
+
+    function test_MultiUserYieldFairness() public {
+        // User A and User B each deposit 100 USDC
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.ThreeMonth);
+
+        vm.prank(user2);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.ThreeMonth);
+
+        // 20 USDC yield accrues
+        uint256 yieldAmount = 20e6;
+        aavePool.simulateYield(address(vault), yieldAmount);
+
+        // User A claims first
+        uint256 userABalBefore = usdc.balanceOf(user);
+        vm.prank(user);
+        vault.claimYield(0);
+        uint256 userAReceived = usdc.balanceOf(user) - userABalBefore;
+
+        // User B claims second — should get the SAME amount (fair split)
+        uint256 userBBalBefore = usdc.balanceOf(user2);
+        vm.prank(user2);
+        vault.claimYield(0);
+        uint256 userBReceived = usdc.balanceOf(user2) - userBBalBefore;
+
+        // Both at ThreeMonth tier (50% user share), so each should get 50% of their 10 USDC share = 5
+        uint256 expectedPerUser = (10e6 * 5000) / 10000; // 5 USDC each
+        assertEq(userAReceived, expectedPerUser, "User A yield unfair");
+        assertEq(userBReceived, expectedPerUser, "User B yield unfair");
+    }
+
+    function test_MultiUserYieldFairness_DifferentAmounts() public {
+        // User A deposits 300, User B deposits 100 (3:1 ratio)
+        vm.prank(user);
+        vault.deposit(300e6, VoxVault.LockTier.Flexible);
+
+        vm.prank(user2);
+        vault.deposit(100e6, VoxVault.LockTier.Flexible);
+
+        // 40 USDC yield accrues
+        aavePool.simulateYield(address(vault), 40e6);
+
+        // User B claims first this time
+        uint256 userBBalBefore = usdc.balanceOf(user2);
+        vm.prank(user2);
+        vault.claimYield(0);
+        uint256 userBReceived = usdc.balanceOf(user2) - userBBalBefore;
+
+        // User A claims second
+        uint256 userABalBefore = usdc.balanceOf(user);
+        vm.prank(user);
+        vault.claimYield(0);
+        uint256 userAReceived = usdc.balanceOf(user) - userABalBefore;
+
+        // Total yield = 40. A has 75% of pool, B has 25%.
+        // A's yield share = 30, B's yield share = 10
+        // Flexible tier = 25% user share
+        uint256 expectedA = (30e6 * 2500) / 10000; // 7.5 USDC
+        uint256 expectedB = (10e6 * 2500) / 10000; // 2.5 USDC
+
+        assertEq(userAReceived, expectedA, "User A yield unfair");
+        assertEq(userBReceived, expectedB, "User B yield unfair");
+    }
+
+    function test_NoDuplicateYieldOnSecondClaim() public {
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.ThreeMonth);
+
+        // First yield accrual + claim
+        aavePool.simulateYield(address(vault), 10e6);
+        vm.prank(user);
+        vault.claimYield(0);
+
+        // Second claim with no new yield — should get nothing
+        uint256 balBefore = usdc.balanceOf(user);
+        vm.prank(user);
+        vault.claimYield(0);
+        uint256 received = usdc.balanceOf(user) - balBefore;
+
+        assertEq(received, 0, "Should not receive yield twice");
+    }
+
+    function test_YieldAccruesAfterFirstClaim() public {
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.ThreeMonth);
+
+        // First yield
+        aavePool.simulateYield(address(vault), 10e6);
+        vm.prank(user);
+        vault.claimYield(0);
+
+        // More yield accrues
+        aavePool.simulateYield(address(vault), 5e6);
+
+        uint256 balBefore = usdc.balanceOf(user);
+        vm.prank(user);
+        vault.claimYield(0);
+        uint256 received = usdc.balanceOf(user) - balBefore;
+
+        uint256 expected = (5e6 * 5000) / 10000; // 2.5 USDC (50% of 5)
+        assertEq(received, expected, "Second yield claim incorrect");
+    }
+
+    // ── Withdrawal Tests ───────────────────────────
+
     function test_WithdrawFlexibleNoPenalty() public {
         vm.prank(user);
         vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.Flexible);
@@ -172,25 +291,6 @@ contract VoxVaultTest is Test {
 
         uint256 balAfter = usdc.balanceOf(user);
         assertEq(balAfter - balBefore, DEPOSIT_AMOUNT);
-    }
-
-    function test_EarlyWithdrawalPenalty() public {
-        vm.prank(user);
-        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.ThreeMonth);
-
-        uint256 userBalBefore = usdc.balanceOf(user);
-        uint256 newsroomBalBefore = usdc.balanceOf(newsroom);
-
-        vm.prank(user);
-        vault.withdraw(0);
-
-        uint256 expectedPenalty = (DEPOSIT_AMOUNT * 500) / 10000;
-        uint256 userReceived = usdc.balanceOf(user) - userBalBefore;
-        uint256 newsroomReceived = usdc.balanceOf(newsroom) - newsroomBalBefore;
-
-        assertEq(userReceived, DEPOSIT_AMOUNT - expectedPenalty, "User should receive amount minus penalty");
-        assertEq(newsroomReceived, expectedPenalty, "Newsroom should receive penalty");
-        assertEq(vault.totalNewsroomFunded(), expectedPenalty, "totalNewsroomFunded should track penalty");
     }
 
     function test_WithdrawAfterLockNoPenalty() public {
@@ -219,6 +319,41 @@ contract VoxVaultTest is Test {
         vm.expectRevert("Position not active");
         vault.withdraw(0);
     }
+
+    // ── Scaled Early Withdrawal Penalty Tests ──────
+
+    function test_EarlyWithdrawalPenalty_ThreeMonth() public {
+        _testEarlyPenalty(VoxVault.LockTier.ThreeMonth, 500); // 5%
+    }
+
+    function test_EarlyWithdrawalPenalty_SixMonth() public {
+        _testEarlyPenalty(VoxVault.LockTier.SixMonth, 750); // 7.5%
+    }
+
+    function test_EarlyWithdrawalPenalty_TwelveMonth() public {
+        _testEarlyPenalty(VoxVault.LockTier.TwelveMonth, 1000); // 10%
+    }
+
+    function _testEarlyPenalty(VoxVault.LockTier tier, uint256 expectedPenaltyBps) internal {
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, tier);
+
+        uint256 userBalBefore = usdc.balanceOf(user);
+        uint256 newsroomBalBefore = usdc.balanceOf(newsroom);
+
+        vm.prank(user);
+        vault.withdraw(0);
+
+        uint256 expectedPenalty = (DEPOSIT_AMOUNT * expectedPenaltyBps) / 10000;
+        uint256 userReceived = usdc.balanceOf(user) - userBalBefore;
+        uint256 newsroomReceived = usdc.balanceOf(newsroom) - newsroomBalBefore;
+
+        assertEq(userReceived, DEPOSIT_AMOUNT - expectedPenalty, "User should receive amount minus penalty");
+        assertEq(newsroomReceived, expectedPenalty, "Newsroom should receive penalty");
+    }
+
+    // ── View Function Tests ────────────────────────
+
     function test_GetUserPositions() public {
         vm.startPrank(user);
         vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.Flexible);
@@ -246,6 +381,30 @@ contract VoxVaultTest is Test {
         vm.stopPrank();
     }
 
+    function test_GetPendingYield() public {
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.ThreeMonth);
+
+        aavePool.simulateYield(address(vault), 10e6);
+
+        (uint256 userAmount, uint256 newsroomAmount) = vault.getPendingYield(user, 0);
+        assertEq(userAmount, 5e6, "Pending user yield");      // 50% of 10
+        assertEq(newsroomAmount, 5e6, "Pending newsroom yield"); // 50% of 10
+    }
+
+    function test_GetPendingYieldInactivePosition() public {
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.Flexible);
+        vm.prank(user);
+        vault.withdraw(0);
+
+        (uint256 userAmount, uint256 newsroomAmount) = vault.getPendingYield(user, 0);
+        assertEq(userAmount, 0);
+        assertEq(newsroomAmount, 0);
+    }
+
+    // ── Admin Tests ────────────────────────────────
+
     function test_SetNewsroomFund() public {
         address newNewsroom = address(0xDEAD);
         vault.setNewsroomFund(newNewsroom);
@@ -256,5 +415,83 @@ contract VoxVaultTest is Test {
         vm.prank(user);
         vm.expectRevert();
         vault.setNewsroomFund(address(0xDEAD));
+    }
+
+    function test_RevertSetNewsroomFundZeroAddress() public {
+        vm.expectRevert("Invalid newsroom address");
+        vault.setNewsroomFund(address(0));
+    }
+
+    function test_PauseDeposit() public {
+        vault.pause();
+
+        vm.prank(user);
+        vm.expectRevert();
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.Flexible);
+    }
+
+    function test_PauseWithdraw() public {
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.Flexible);
+
+        vault.pause();
+
+        vm.prank(user);
+        vm.expectRevert();
+        vault.withdraw(0);
+    }
+
+    function test_PauseClaimYield() public {
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.Flexible);
+        aavePool.simulateYield(address(vault), 10e6);
+
+        vault.pause();
+
+        vm.prank(user);
+        vm.expectRevert();
+        vault.claimYield(0);
+    }
+
+    function test_UnpauseResumesOperations() public {
+        vm.prank(user);
+        vault.deposit(DEPOSIT_AMOUNT, VoxVault.LockTier.Flexible);
+
+        vault.pause();
+        vault.unpause();
+
+        // Should succeed after unpause
+        uint256 balBefore = usdc.balanceOf(user);
+        vm.prank(user);
+        vault.withdraw(0);
+        assertEq(usdc.balanceOf(user) - balBefore, DEPOSIT_AMOUNT);
+    }
+
+    function test_RevertPauseNotOwner() public {
+        vm.prank(user);
+        vm.expectRevert();
+        vault.pause();
+    }
+
+    // ── Constructor Validation Tests ───────────────
+
+    function test_RevertConstructorZeroUsdc() public {
+        vm.expectRevert("Invalid USDC address");
+        new VoxVault(address(0), address(aUsdc), address(aavePool), newsroom);
+    }
+
+    function test_RevertConstructorZeroAUsdc() public {
+        vm.expectRevert("Invalid aUSDC address");
+        new VoxVault(address(usdc), address(0), address(aavePool), newsroom);
+    }
+
+    function test_RevertConstructorZeroPool() public {
+        vm.expectRevert("Invalid Aave pool address");
+        new VoxVault(address(usdc), address(aUsdc), address(0), newsroom);
+    }
+
+    function test_RevertConstructorZeroNewsroom() public {
+        vm.expectRevert("Invalid newsroom address");
+        new VoxVault(address(usdc), address(aUsdc), address(aavePool), address(0));
     }
 }

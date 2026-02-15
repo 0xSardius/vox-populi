@@ -162,7 +162,7 @@ function LivePositionCard({
   position,
   positionId,
 }: {
-  position: { amount: bigint; depositTime: bigint; unlockTime: bigint; tier: number; lastClaimTime: bigint; active: boolean };
+  position: { amount: bigint; depositTime: bigint; unlockTime: bigint; tier: number; yieldDebt: bigint; active: boolean };
   positionId: number;
 }) {
   const now = BigInt(Math.floor(Date.now() / 1000));

@@ -36,7 +36,7 @@ export const voxVaultAbi = [
           { name: 'depositTime', type: 'uint256' },
           { name: 'unlockTime', type: 'uint256' },
           { name: 'tier', type: 'uint8' },
-          { name: 'lastClaimTime', type: 'uint256' },
+          { name: 'yieldDebt', type: 'uint256' },
           { name: 'active', type: 'bool' },
         ],
       },
@@ -59,7 +59,7 @@ export const voxVaultAbi = [
           { name: 'depositTime', type: 'uint256' },
           { name: 'unlockTime', type: 'uint256' },
           { name: 'tier', type: 'uint8' },
-          { name: 'lastClaimTime', type: 'uint256' },
+          { name: 'yieldDebt', type: 'uint256' },
           { name: 'active', type: 'bool' },
         ],
       },
@@ -71,6 +71,19 @@ export const voxVaultAbi = [
     name: 'getPositionCount',
     inputs: [{ name: 'user', type: 'address' }],
     outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getPendingYield',
+    inputs: [
+      { name: 'user', type: 'address' },
+      { name: 'positionId', type: 'uint256' },
+    ],
+    outputs: [
+      { name: 'userAmount', type: 'uint256' },
+      { name: 'newsroomAmount', type: 'uint256' },
+    ],
     stateMutability: 'view',
   },
   {
@@ -96,14 +109,14 @@ export const voxVaultAbi = [
   },
   {
     type: 'function',
-    name: 'MIN_DEPOSIT',
-    inputs: [],
+    name: 'earlyWithdrawalPenaltyBps',
+    inputs: [{ name: '', type: 'uint8' }],
     outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
-    name: 'EARLY_WITHDRAWAL_PENALTY_BPS',
+    name: 'MIN_DEPOSIT',
     inputs: [],
     outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
@@ -127,6 +140,13 @@ export const voxVaultAbi = [
     name: 'owner',
     inputs: [],
     outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'paused',
+    inputs: [],
+    outputs: [{ name: '', type: 'bool' }],
     stateMutability: 'view',
   },
   {
@@ -157,6 +177,14 @@ export const voxVaultAbi = [
       { name: 'positionId', type: 'uint256', indexed: true },
       { name: 'userAmount', type: 'uint256', indexed: false },
       { name: 'newsroomAmount', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'NewsroomFundUpdated',
+    inputs: [
+      { name: 'oldFund', type: 'address', indexed: true },
+      { name: 'newFund', type: 'address', indexed: true },
     ],
   },
 ] as const;
