@@ -171,18 +171,22 @@ contract VoxVault is Ownable, ReentrancyGuard, Pausable {
         pos.active = false;
         totalDeposited -= amount;
 
-        uint256 actualWithdrawn = aavePool.withdraw(address(usdc), amount, address(this));
-        require(actualWithdrawn == amount, "Aave partial withdrawal");
-        lastTrackedBalance -= amount;
+        // Cap withdrawal to actual aUSDC balance (Aave's scaled math can round down by 1-2 wei)
+        uint256 aUsdcBal = aUsdc.balanceOf(address(this));
+        uint256 toWithdraw = amount > aUsdcBal ? aUsdcBal : amount;
+        uint256 actualWithdrawn = aavePool.withdraw(address(usdc), toWithdraw, address(this));
+        lastTrackedBalance = lastTrackedBalance > actualWithdrawn ? lastTrackedBalance - actualWithdrawn : 0;
 
-        usdc.safeTransfer(msg.sender, amount - penalty);
+        // Distribute what was actually received; penalty still based on original amount
+        uint256 userReceives = actualWithdrawn > penalty ? actualWithdrawn - penalty : 0;
+        usdc.safeTransfer(msg.sender, userReceives);
 
         if (penalty > 0) {
             usdc.safeTransfer(newsroomFund, penalty);
             totalNewsroomFunded += penalty;
         }
 
-        emit Withdrawn(msg.sender, positionId, amount, penalty);
+        emit Withdrawn(msg.sender, positionId, actualWithdrawn, penalty);
     }
 
     function claimYield(uint256 positionId) external nonReentrant whenNotPaused {
@@ -201,12 +205,16 @@ contract VoxVault is Ownable, ReentrancyGuard, Pausable {
 
         if (pending == 0) return;
 
-        uint256 userYield = (pending * userShareBps[pos.tier]) / 10000;
-        uint256 newsroomYield = pending - userYield;
+        // Cap to actual aUSDC balance (Aave rounding)
+        uint256 aUsdcBal = aUsdc.balanceOf(address(this));
+        uint256 toWithdraw = pending > aUsdcBal ? aUsdcBal : pending;
+        if (toWithdraw == 0) return;
 
-        uint256 actualWithdrawn = aavePool.withdraw(address(usdc), pending, address(this));
-        require(actualWithdrawn == pending, "Aave partial withdrawal");
-        lastTrackedBalance -= pending;
+        uint256 actualWithdrawn = aavePool.withdraw(address(usdc), toWithdraw, address(this));
+        lastTrackedBalance = lastTrackedBalance > actualWithdrawn ? lastTrackedBalance - actualWithdrawn : 0;
+
+        uint256 userYield = (actualWithdrawn * userShareBps[pos.tier]) / 10000;
+        uint256 newsroomYield = actualWithdrawn - userYield;
 
         if (userYield > 0) usdc.safeTransfer(user, userYield);
         if (newsroomYield > 0) {

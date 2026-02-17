@@ -22,7 +22,7 @@ export const CONTRACTS = {
     [base.id]: '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5' as const,
   },
   VOX_VAULT: {
-    [base.id]: '0x654E89904de401eB863992D55a8211266fB6d0Ca' as const,
+    [base.id]: '0x0672322b544B5291277F2d99142104B29a155846' as const,
     [baseSepolia.id]: '0x3Ef45c1609196Df07Fae89448e1c6740660523D8' as const,
   },
 } as const;
