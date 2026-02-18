@@ -4,24 +4,17 @@ import Link from 'next/link';
 import { useFarcaster } from '@/lib/farcaster';
 import { useVaultStats, formatUsdc } from '@/lib/contracts';
 
-// Fallback data when vault is not yet deployed
-const MOCK_DATA = {
-  tvl: 1_247_832,
-  totalFunded: 312_456,
-  depositors: 847,
-};
-
 export default function Home() {
   const { displayName, pfpUrl, isInClient } = useFarcaster();
   const { totalDeposited, totalFunded, isLive } = useVaultStats();
 
-  // Use live data when available, otherwise mock
-  const tvl = isLive && totalDeposited !== undefined
+  // Live on-chain data (0 if no deposits yet — that's real)
+  const tvl = totalDeposited !== undefined
     ? Number(formatUsdc(totalDeposited))
-    : MOCK_DATA.tvl;
-  const funded = isLive && totalFunded !== undefined
+    : 0;
+  const funded = totalFunded !== undefined
     ? Number(formatUsdc(totalFunded))
-    : MOCK_DATA.totalFunded;
+    : 0;
 
   return (
     <div className="px-5 py-6 space-y-8">
@@ -63,11 +56,6 @@ export default function Home() {
               <p className="text-[10px] font-display uppercase tracking-[0.25em] text-muted/60">
                 Total Value Locked
               </p>
-              {!isLive && (
-                <span className="text-[8px] font-display uppercase tracking-wider text-muted/30 bg-white/[0.04] px-1.5 py-0.5 rounded">
-                  Demo
-                </span>
-              )}
             </div>
             <p className="text-[44px] leading-none font-display font-bold text-foreground tracking-tight">
               ${tvl.toLocaleString()}
@@ -135,7 +123,7 @@ export default function Home() {
             Depositors
           </p>
           <p className="text-xl font-display font-bold text-primary mt-1.5">
-            {MOCK_DATA.depositors.toLocaleString()}
+            &mdash;
           </p>
         </div>
       </div>
