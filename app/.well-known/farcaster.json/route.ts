@@ -20,10 +20,10 @@ export async function GET() {
       name: 'Vox Populi',
       subtitle: 'Earn yield. Fund journalism.',
       description:
-        'Stake USDC on Base, earn yield via Aave V3, and automatically share a portion with an independent journalism fund. Longer lock commitments let you keep more of your yield.',
+        'Stake USDC on Base, earn yield via Aave V3, and share a portion with independent journalism. Longer locks = more yield for you.',
       tagline: 'Voice of the people.',
       primaryCategory: 'finance',
-      tags: ['defi', 'yield', 'journalism', 'usdc', 'base', 'aave'],
+      tags: ['defi', 'yield', 'journalism', 'usdc', 'base'],
       iconUrl: `${appUrl}/icon.svg`,
       homeUrl: appUrl,
       imageUrl: `${appUrl}/api/og`,
