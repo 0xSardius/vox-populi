@@ -1,21 +1,19 @@
 import { NextResponse } from 'next/server';
 
-// Farcaster Mini App Manifest
-// This will be filled in once we have:
-// 1. Domain signed with Farcaster account
-// 2. Production URL
-// 3. App icons/images
-
 export async function GET() {
-  const appUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
+  const appUrl =
+    process.env.NEXT_PUBLIC_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : 'https://vox-populi-five.vercel.app');
 
   const manifest = {
     accountAssociation: {
-      // TODO: Sign domain with Farcaster account at
-      // https://farcaster.xyz/~/developers/mini-apps/manifest
-      header: '',
-      payload: '',
-      signature: '',
+      header:
+        'eyJmaWQiOjIzODgxNCwidHlwZSI6ImF1dGgiLCJrZXkiOiIweDYyNjUyMkI1OGI5MmRBRjUzNTk2RjEzNzhiZDI1Qjc2NTNjMWZDNDkifQ',
+      payload: 'eyJkb21haW4iOiJ2b3gtcG9wdWxpLWZpdmUudmVyY2VsLmFwcCJ9',
+      signature:
+        'gtcEE0WJKXstbSLCvAAk8jRLJYCm8YHE1eFvxFtqim1AY6vksSuCK+028bxwK9M26BzKXlF3HG/i/ahhgO3imxs=',
     },
     miniapp: {
       version: '1',
@@ -26,8 +24,7 @@ export async function GET() {
       buttonTitle: 'Open App',
       splashImageUrl: `${appUrl}/splash.svg`,
       splashBackgroundColor: '#0a0a0a',
-      // Require Base chain and wallet capabilities
-      requiredChains: ['eip155:8453'], // Base mainnet
+      requiredChains: ['eip155:8453'],
       requiredCapabilities: [
         'actions.signIn',
         'wallet.getEthereumProvider',
