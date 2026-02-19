@@ -5,22 +5,31 @@ import { sdk } from '@farcaster/miniapp-sdk';
 export { sdk };
 
 /**
- * Check if running inside a Farcaster client
+ * Check if running inside a Farcaster Mini App using the SDK's
+ * built-in detection (iframe + context verification).
+ * Falls back to false after timeout.
  */
-export function isInFarcasterClient(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.parent !== window;
+export async function isInMiniApp(): Promise<boolean> {
+  try {
+    return await sdk.isInMiniApp();
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Get the current user's context from the Farcaster SDK
+ * Race a promise against a timeout. Returns fallback if the promise
+ * doesn't resolve within `ms` milliseconds.
  */
-export async function getContext() {
-  try {
-    return sdk.context;
-  } catch {
-    return null;
-  }
+export function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  fallback: T
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
 }
 
 /**

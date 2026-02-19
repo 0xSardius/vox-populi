@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useAccount, useConnect } from 'wagmi';
-import { sdk, isInFarcasterClient, getAuthToken } from './sdk';
+import { sdk, isInMiniApp, withTimeout, getAuthToken } from './sdk';
 
 interface FarcasterUser {
   fid: number;
@@ -70,28 +70,28 @@ export function FarcasterProvider({ children }: FarcasterProviderProps) {
 
   useEffect(() => {
     const init = async () => {
-      const inClient = isInFarcasterClient();
+      // Use the SDK's built-in detection (iframe + context verification)
+      const inClient = await isInMiniApp();
       setIsInClient(inClient);
 
       if (inClient) {
-        try {
-          await sdk.actions.ready();
-        } catch (error) {
-          console.error('Failed to initialize Farcaster SDK:', error);
-        }
-        // Unblock rendering immediately after ready() — don't wait for context/auth
-        setIsReady(true);
+        // Call ready() with a 3s timeout — if it hangs, render anyway
+        await withTimeout(
+          sdk.actions.ready().catch(() => {}),
+          3000,
+          undefined
+        );
+      }
 
-        // Load context and auth token in the background
-        try {
-          const ctx = await sdk.context;
-          setContext(ctx);
-        } catch {
-          // Context unavailable — app still works without it
-        }
+      // Always unblock rendering
+      setIsReady(true);
+
+      // Load context and auth in the background (non-blocking)
+      if (inClient) {
+        withTimeout(sdk.context, 3000, null)
+          .then((ctx) => { if (ctx) setContext(ctx); })
+          .catch(() => {});
         refreshToken().catch(() => {});
-      } else {
-        setIsReady(true);
       }
     };
 
