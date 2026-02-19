@@ -24,7 +24,7 @@ export async function GET() {
       tagline: 'Voice of the people.',
       primaryCategory: 'finance',
       tags: ['defi', 'yield', 'journalism', 'usdc', 'base'],
-      iconUrl: `${appUrl}/icon.svg`,
+      iconUrl: `${appUrl}/api/icon`,
       homeUrl: appUrl,
       imageUrl: `${appUrl}/api/og`,
       buttonTitle: 'Open App',
