@@ -76,14 +76,20 @@ export function FarcasterProvider({ children }: FarcasterProviderProps) {
       if (inClient) {
         try {
           await sdk.actions.ready();
-          const ctx = await sdk.context;
-          setContext(ctx);
-          await refreshToken();
-          setIsReady(true);
         } catch (error) {
           console.error('Failed to initialize Farcaster SDK:', error);
-          setIsReady(true);
         }
+        // Unblock rendering immediately after ready() — don't wait for context/auth
+        setIsReady(true);
+
+        // Load context and auth token in the background
+        try {
+          const ctx = await sdk.context;
+          setContext(ctx);
+        } catch {
+          // Context unavailable — app still works without it
+        }
+        refreshToken().catch(() => {});
       } else {
         setIsReady(true);
       }
