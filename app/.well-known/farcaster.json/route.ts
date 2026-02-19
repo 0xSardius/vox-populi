@@ -18,12 +18,23 @@ export async function GET() {
     miniapp: {
       version: '1',
       name: 'Vox Populi',
+      subtitle: 'Earn yield. Fund journalism.',
+      description:
+        'Stake USDC on Base, earn yield via Aave V3, and automatically share a portion with an independent journalism fund. Longer lock commitments let you keep more of your yield.',
+      tagline: 'Voice of the people.',
+      primaryCategory: 'finance',
+      tags: ['defi', 'yield', 'journalism', 'usdc', 'base', 'aave'],
       iconUrl: `${appUrl}/icon.svg`,
       homeUrl: appUrl,
-      imageUrl: `${appUrl}/og-image.svg`,
+      imageUrl: `${appUrl}/api/og`,
       buttonTitle: 'Open App',
       splashImageUrl: `${appUrl}/splash.svg`,
       splashBackgroundColor: '#0a0a0a',
+      heroImageUrl: `${appUrl}/api/og`,
+      ogTitle: 'Vox Populi',
+      ogDescription:
+        'Stake USDC on Base. Earn yield via Aave V3. Fund independent journalism.',
+      ogImageUrl: `${appUrl}/api/og`,
       requiredChains: ['eip155:8453'],
       requiredCapabilities: [
         'actions.signIn',

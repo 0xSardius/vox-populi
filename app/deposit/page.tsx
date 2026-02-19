@@ -159,19 +159,39 @@ export default function DepositPage() {
               ${numericAmount.toLocaleString()} USDC deposited with {tier.label} lock
             </p>
           </div>
-          <div className="flex gap-3">
-            <Link
-              href="/dashboard"
-              className="py-3 px-6 bg-gradient-to-r from-primary to-primary-hover text-white font-display font-semibold text-sm tracking-[0.1em] uppercase rounded-xl press-scale"
-            >
-              View Position
-            </Link>
-            <button
-              onClick={resetFlow}
-              className="py-3 px-6 card-subtle font-display font-semibold text-sm tracking-[0.1em] uppercase rounded-xl press-scale text-foreground"
-            >
-              New Deposit
-            </button>
+          <div className="flex flex-col gap-3 w-full max-w-xs">
+            {isInClient && (
+              <button
+                onClick={async () => {
+                  try {
+                    const { sdk } = await import('@farcaster/miniapp-sdk');
+                    await sdk.actions.composeCast({
+                      text: `I just deposited $${numericAmount.toLocaleString()} USDC into Vox Populi with a ${tier.label} lock.\n\nEarning yield on Base via Aave V3 while funding independent journalism.`,
+                      embeds: ['https://vox-populi-five.vercel.app'],
+                    });
+                  } catch {
+                    // User cancelled or SDK unavailable
+                  }
+                }}
+                className="w-full py-3 px-6 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-display font-semibold text-sm tracking-[0.1em] uppercase rounded-xl press-scale transition-colors"
+              >
+                Share on Farcaster
+              </button>
+            )}
+            <div className="flex gap-3">
+              <Link
+                href="/dashboard"
+                className="flex-1 py-3 px-6 bg-gradient-to-r from-primary to-primary-hover text-white font-display font-semibold text-sm tracking-[0.1em] uppercase rounded-xl press-scale text-center"
+              >
+                View Position
+              </Link>
+              <button
+                onClick={resetFlow}
+                className="flex-1 py-3 px-6 card-subtle font-display font-semibold text-sm tracking-[0.1em] uppercase rounded-xl press-scale text-foreground"
+              >
+                New Deposit
+              </button>
+            </div>
           </div>
         </div>
       ) : (
